@@ -236,10 +236,10 @@ let listenToSwaps = async (pairContract, pairAddress, shitTokenAddress, regToken
                 }
 
                 let jsonResults = JSON.stringify(results);
-                console.log(jsonResults);
                 try {
                     await sendBuyMessageMQ(channelToMq, jsonResults);
                 } catch (error) {
+                    errorLogger.error(`couldnt send buy message because ${error}`);
                     await sendBuyMessageMQ(channelToMq, jsonResults);
                 }
 
@@ -434,7 +434,7 @@ async function beginListening() {
 async function restoreExistingTrendingRecords() {
     await retrieveAllItems().then(async (rows) => {
         for (let row of rows) {
-            infoLogger.info(`restoring trending for the following ${JSON.stringify(row)}`);
+            infoLogger.info(`restoring listening for the following ${JSON.stringify(row)}`);
             await addNewTokenToListening(
                 row.pair,
                 row.shitTokenAddress,
