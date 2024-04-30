@@ -160,8 +160,10 @@ async function setTokenOrdering(shitTokenAddress, regTokenAddress) {
         const isToken0 = BigInt(shitTokenAddress) < BigInt(regTokenAddress);
 
         if (isToken0) {
+            console.log('yo')
             contractOrdering.set(shitTokenAddress, 0);
         } else {
+            console.log('nigga')
             contractOrdering.set(shitTokenAddress, 1);
         }
     } catch (err) {
