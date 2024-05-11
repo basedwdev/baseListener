@@ -17,7 +17,7 @@ const decimalValues = new Map();
 const lastTimeBought = new Map();
 
 const listOfProviders = [
-    "https://base.llamarpc.com",
+    //"https://base.llamarpc.com",
     "https://base-rpc.publicnode.com",
     "https://mainnet.base.org"
 ];
