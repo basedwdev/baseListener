@@ -237,10 +237,12 @@ let listenToSwaps = async (pairContract, pairAddress, shitTokenAddress, regToken
 
                 let jsonResults = JSON.stringify(results);
                 try {
-                    if (results.amountReceived >= "0.01") {
+                    console.log(results.amountReceived > 0.01)
+                    if (results.amountReceived > 0.01) {
+                        console.log('yes ' + results.amountReceived)
                         await sendBuyMessageMQ(channelToMq, jsonResults);
                     } else {
-                        console.log(gay)
+                        console.log("gay " + results.amountReceived)
                     }
                 } catch (error) {
                     errorLogger.error(`couldnt send buy message because ${error}`);
