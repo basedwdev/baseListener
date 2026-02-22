@@ -1,0 +1,25 @@
+{
+    "name": "swap-bot",
+    "version": "1.0.0",
+    "description": "Uniswap V3 swap event listener — publishes buy events via Redis pub/sub",
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "test": "node --env-file=.env.test --test"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "better-sqlite3": "^12.6.2",
+        "dotenv": "^17.3.1",
+        "ethers": "^6.16.0",
+        "ioredis": "^5.9.3",
+        "winston": "^3.19.0",
+        "winston-daily-rotate-file": "^5.0.0"
+    }
+}
