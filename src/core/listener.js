@@ -62,32 +62,43 @@ export class ListenerManager {
             await publish(config.redis.channels.errors, { error: err.message, pair, ...meta }).catch(() => { });
         };
 
+        // Queue events to process them sequentially and prevent out-of-memory
+        // errors when hundreds of swaps occur in a single block (e.g. WETH/USDC)
+        let processingQueue = Promise.resolve();
+
         // S3: wrap entire handler body in try/catch to surface unexpected errors.
-        contract.on('Swap', async (...args) => {
-            try {
-                const event = args[args.length - 1];
-                const ctx = {
-                    pairAddress: pair,
-                    memeTokenAddress,
-                    baseTokenAddress,
-                    memeDecimals: memeTokenDecimals,
-                    baseDecimals: baseTokenDecimals,
-                    tokenOrdering,
-                    provider: this.provider,
-                    memeContract,
-                    minAmountReceived: config.minAmountReceived,  // S5
-                    onError,                                       // S3
-                };
+        // Listen using the event filter rather than the string name to prevent
+        // ethers from fetching historical logs and hitting RPC limits.
+        const filter = contract.filters.Swap();
+        contract.on(filter, (...args) => {
+            processingQueue = processingQueue.then(async () => {
+                try {
+                    const event = args[args.length - 1];
+                    const ctx = {
+                        pairAddress: pair,
+                        memeTokenAddress,
+                        baseTokenAddress,
+                        memeDecimals: memeTokenDecimals,
+                        baseDecimals: baseTokenDecimals,
+                        tokenOrdering,
+                        provider: this.provider,
+                        memeContract,
+                        minAmountReceived: config.minAmountReceived,
+                        onError,
+                    };
 
-                const result = await processSwapEvent(event, ctx);
-                if (!result) return;
+                    const result = await processSwapEvent(event, ctx);
+                    if (!result) return;
 
-                await publish(config.redis.channels.buys, result);
-                await this._throttledDbUpdate(pair);
-            } catch (err) {
-                logger.error(`Unhandled error in Swap handler for ${pair}: ${err.message}`, { component: 'listener' });
-                await publish(config.redis.channels.errors, { error: err.message, pair }).catch(() => { });
-            }
+                    await publish(config.redis.channels.buys, result);
+                    await this._throttledDbUpdate(pair);
+                } catch (err) {
+                    logger.error(`Unhandled error in Swap handler for ${pair}: ${err.message}`, { component: 'listener' });
+                    await publish(config.redis.channels.errors, { error: err.message, pair }).catch(() => { });
+                }
+            }).catch(err => {
+                logger.error(`Queue error for ${pair}: ${err.message}`, { component: 'listener' });
+            });
         });
 
         this.active.set(pair, { contract, lastBoughtAt: 0 });

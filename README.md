@@ -86,6 +86,104 @@ pm2 logs swap-bot
 
 ---
 
+## Docker
+
+### Local dev — bot + Redis in one compose
+
+**1. Configure**
+```bash
+cp .env.example .env
+```
+Edit `.env` and set `REDIS_URL=redis://redis:6379` — this is the hostname Docker Compose assigns to the Redis service. Fill in `RPC_PROVIDERS` with your Base chain RPC URL(s).
+
+**2. Build and start**
+```bash
+docker compose up --build
+```
+This builds the swap-bot image and starts both services. Redis comes up first (healthcheck-gated); the bot starts once Redis is ready. Named volumes (`swap-bot-data`, `swap-bot-logs`) persist SQLite and log files across restarts.
+
+**3. Verify it's running**
+```bash
+docker compose ps           # both services should show "running"
+docker compose logs -f      # tail live logs from both containers
+docker compose logs swap-bot  # bot logs only
+```
+
+**4. Stop / teardown**
+```bash
+docker compose down          # stop containers, keep volumes
+docker compose down -v       # stop and delete volumes (wipes DB + logs)
+```
+
+---
+
+### Production — standalone container, external Redis
+
+Use this when Redis is already running elsewhere (another host, managed service, another compose stack).
+
+**1. Build the image**
+```bash
+docker build -t swap-bot:latest .
+```
+
+**2. Configure**
+```bash
+cp .env.example .env
+```
+Set `REDIS_URL` to your production Redis (e.g. `redis://10.0.0.5:6379` or `rediss://user:pass@host:6380`). Set `RPC_PROVIDERS`, `DB_PATH`, and `LOG_DIR` as needed.
+
+**3. Create volumes**
+```bash
+docker volume create swap-bot-data
+docker volume create swap-bot-logs
+```
+
+**4. Run**
+```bash
+docker run -d \
+  --name swap-bot \
+  --env-file .env \
+  -v swap-bot-data:/app/data \
+  -v swap-bot-logs:/app/logs \
+  --restart unless-stopped \
+  swap-bot:latest
+```
+
+The container exposes no ports — all I/O is through Redis pub/sub.
+
+**5. Verify**
+```bash
+docker logs -f swap-bot          # follow live logs
+docker inspect swap-bot          # full container state
+docker exec -it swap-bot sh      # open a shell inside
+```
+
+**6. Update to a new version**
+```bash
+docker build -t swap-bot:latest .
+docker stop swap-bot && docker rm swap-bot
+# re-run the docker run command from step 4 — volumes are preserved
+```
+
+---
+
+### Pushing to a registry (optional)
+
+```bash
+docker tag swap-bot:latest ghcr.io/<your-org>/swap-bot:latest
+docker push ghcr.io/<your-org>/swap-bot:latest
+```
+
+On the target host:
+```bash
+docker pull ghcr.io/<your-org>/swap-bot:latest
+docker run -d --name swap-bot --env-file .env \
+  -v swap-bot-data:/app/data -v swap-bot-logs:/app/logs \
+  --restart unless-stopped \
+  ghcr.io/<your-org>/swap-bot:latest
+```
+
+
 ## Test
 
 ```bash

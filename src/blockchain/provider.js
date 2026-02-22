@@ -1,4 +1,4 @@
-import { JsonRpcProvider, FallbackProvider } from 'ethers';
+import { WebSocketProvider, FallbackProvider } from 'ethers';
 import { logger } from '../logger.js';
 
 /**
@@ -15,7 +15,37 @@ export async function getProvider(urls) {
 
     for (const url of urls) {
         try {
-            const provider = new JsonRpcProvider(url);
+            // Create a wrapper function so we can recreate the provider on disconnect
+            const createWSProvider = () => {
+                const provider = new WebSocketProvider(url);
+                let pingInterval;
+
+                provider.websocket.on('open', () => {
+                    // Send a ping every 10 seconds to keep the connection alive
+                    pingInterval = setInterval(() => {
+                        if (provider.websocket.readyState === 1) { // OPEN
+                            provider.websocket.ping();
+                        }
+                    }, 10000);
+                });
+
+                provider.websocket.on('close', (code) => {
+                    clearInterval(pingInterval);
+                    logger.error(`WebSocket closed for ${url} (code ${code}), terminating process to trigger Docker restart.`, { component: 'provider' });
+                    // In a containerized environment, crashing ungracefully and letting 
+                    // Docker `restart: unless-stopped` handle the exact state rebuild 
+                    // is far safer than trying to hot-swap a FallbackProvider mid-flight.
+                    process.exit(1);
+                });
+
+                provider.websocket.on('error', (err) => {
+                    logger.error(`WebSocket error for ${url}: ${err.message}`, { component: 'provider' });
+                });
+
+                return provider;
+            };
+
+            const provider = createWSProvider();
             // getBlockNumber() is a lightweight call — confirms the node is reachable
             await provider.getBlockNumber();
             logger.info(`RPC confirmed: ${url}`, { component: 'provider' });

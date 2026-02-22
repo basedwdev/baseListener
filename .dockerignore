@@ -1,6 +1,8 @@
 node_modules/
+.git/
+.DS_Store
 .env
 data/
 logs/
-.DS_Store
-**/.DS_Store
+tests/
+*.md

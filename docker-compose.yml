@@ -1,0 +1,42 @@
+# Dev:  docker compose --profile dev up --build
+#         → starts swap-bot + a local Redis container
+#         → set REDIS_URL=redis://redis:6379 in your .env
+#
+# Prod: docker compose up --build
+#         → starts only swap-bot
+#         → set REDIS_URL to your external Redis in .env
+
+services:
+  swap-bot:
+    build: .
+    env_file: .env
+    volumes:
+      - swap-bot-data:/app/data   # SQLite persistence
+      - swap-bot-logs:/app/logs   # rotating log files
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    profiles: [dev]              # only started with --profile dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  seeder:
+    image: redis:7-alpine
+    profiles: [dev]
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts
+    entrypoint: ["/bin/sh", "/scripts/seed-test-pair.sh"]
+
+volumes:
+  swap-bot-data:
+  swap-bot-logs:
